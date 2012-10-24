@@ -1,4 +1,0 @@
-gcfetch
-=======
-
-Fetch website sitemaps
