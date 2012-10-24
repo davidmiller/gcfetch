@@ -217,6 +217,10 @@ def output(sitemap, domain):
     Exceptions: None
     """
     labels = dict((n, n +"\n" + ("-" * len(n)) + "\n" + "\n".join(d['statics'])) for n,d in sitemap.nodes(data=True))
+    # These work decreasingly well for larger sites.
+    # I guess that's to be expected, as top notch visualisation of
+    # these kind of graphs is, itself an interesting problem.
+    # Possibly out of scope here.
     networkx.draw(sitemap, labels=labels)
     # Adjust the size up to the point at which it's useful
     F = pylab.gcf()
