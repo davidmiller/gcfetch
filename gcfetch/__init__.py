@@ -1,15 +1,17 @@
 """
 gcfetch
-
-Package init file
 """
 import collections
 import json
+import itertools
 import re
 import sys
+import time
 import urlparse
 
 import argparse
+import gevent
+from gevent import monkey
 from lxml import html
 import matplotlib.pyplot as plt
 import networkx
@@ -17,6 +19,8 @@ import pylab
 import requests
 
 from _version import __version__
+
+monkey.patch_all()
 
 DONE = """
 *******************************************************
@@ -52,7 +56,6 @@ def deprotocolise(url):
     Exceptions: None
     """
     return PROTORE.sub('', url)
-
 
 def indomain(url, domain):
     """
@@ -119,9 +122,12 @@ def fetch_website(sitemap, seen, base, url):
     Recursive function to fill SITEMAP with the documents that
     make up BASE, looking at URL at the first pass.
 
+    SEEN should be a set of urls we have encountered already, and
+    thus should not parse.
 
     Arguments:
     - `sitemap`: dict
+    - `seen`: set
     - `base`: str
     - `url`: str
 
@@ -151,6 +157,55 @@ def fetch_website(sitemap, seen, base, url):
 
     return
 
+def fetch_url_gevent(sitemap, base, url):
+    """
+    Expected to be the target function of a Greenlet, we
+    fetch a single URL, parse it, and add it's information to
+    the SITEMAP.
+
+    Arguments:
+    - `sitemap`: networkx.DiGraph
+    - `base`: str
+    - `url`: str
+
+    Return: None
+    Exceptions: None
+    """
+    print "starting", url
+    markup = html.document_fromstring(requests.get(url).content)
+    print "got", url
+    markup.make_links_absolute(base)
+    statics, links = getstatic(markup), getlinks_to(markup, base)
+    sitemap.add_node(url, statics=statics, links=links)
+    return links
+
+def fetch_website_gevent(sitemap, seen, base, urls):
+    """
+    Recursive function to fill SITEMAP with the documents that
+    make up BASE, looking at each url in URLS at the first pass.
+
+    SEEN should be a set of urls we have encountered already, and
+    thus should not parse.1
+
+    Arguments:
+    - `sitemap`: dict
+    - `seen`: set
+    - `base`: str
+    - `urls`: [str,]
+
+    Return:
+    Exceptions:
+    """
+    jobs = [gevent.spawn(fetch_url_gevent, sitemap, base, u) for u in urls]
+    gevent.joinall(jobs)
+    links = set(itertools.chain(*[greenlet.get() for greenlet in jobs]))
+    unseen = links.difference(seen)
+    if unseen:
+        seen.update(unseen)
+        fetch_website_gevent(sitemap, seen, base, unseen)
+    return
+
+
 def output(sitemap, domain):
     """
     Produce our representation of the graph SITEMAP
@@ -173,6 +228,20 @@ def output(sitemap, domain):
     plt.savefig(filename)
     return filename
 
+def bench_report(t1, t2):
+    """
+    Simplistic benchmarking reporting. Print the time taken.
+
+    Arguments:
+    - `t1`: float
+    - `t2`: float
+
+    Return: None
+    Exceptions: None
+    """
+    print "\n\n Time taken: {0}".format(t2 - t1)
+
+
 def main(args):
     """
     Entrypoint when run as a script
@@ -183,17 +252,23 @@ def main(args):
     Return: int
     Exceptions: None
     """
+    t1 = time.time()
     # Most of the URL fetching libraries will want an explicit protocol.
     # Allow loose commandline args
     base = protocolise(args.domain)
 
     seen = set()
     sitemap = networkx.DiGraph()
-    fetch_website(sitemap, seen, base, base)
+
+    #fetch_website(sitemap, seen, base, base)
+    fetch_website_gevent(sitemap, set([base]), base, [base])
 
     outfile = output(sitemap, deprotocolise(base))
 
+    t2 = time.time()
     print DONE.format(outfile)
+    if args.bench:
+        bench_report(t1, t2)
 
     return 0
 
@@ -201,5 +276,6 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Fetch and visualise website sitemaps")
     parser.add_argument('domain', help="Domain you'd like to scrape")
+    parser.add_argument('-b', '--bench', action="store_true", help="Benchmark this run")
     args = parser.parse_args()
     sys.exit(main(args))
