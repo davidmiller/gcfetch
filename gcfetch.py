@@ -18,8 +18,6 @@ import networkx
 import pylab
 import requests
 
-from _version import __version__
-
 monkey.patch_all()
 
 DONE = """
