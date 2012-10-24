@@ -1,4 +1,18 @@
 
-We'd like you to write a web crawler in a modern, dynamic language. Something like Ruby, Python, PHP or JavaScript. It should be limited to one domain - so when crawling gocardless.com it would crawl all pages within the gocardless.com domain, but not follow the links to our Facebook and Twitter accounts. Given a URL, it should output a site map, showing which static assets each page depends on, and the links between pages. Choose the most appropriate data structure to store & display this site map.
+How to generate a sitemap:
 
-Bonus points for making it as fast as possible! Don't spend too long on it - it should probably take you a couple of hours.
+$ git clone https://github.com/davidmiller/gcfetch.git
+
+$ virtualenv /where/you/put/your/virtualenvs/gcfetch
+
+$ . /where/you/put/your/virtualenvs/gcfetch/bin/activate
+
+$ pip install numpy
+
+$ pip install -r requirements.txt
+
+$ python gcfetch.py yourfancydomain.py
+
+Notes:
+
+There's some funkiness with the Python matplotlib bindings which means that they both bomb out on failed dependencies when installing, and also don't just require those dependencies.
