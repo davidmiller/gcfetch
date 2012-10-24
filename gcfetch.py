@@ -175,6 +175,8 @@ def fetch_url_gevent(sitemap, base, url):
     markup.make_links_absolute(base)
     statics, links = getstatic(markup), getlinks_to(markup, base)
     sitemap.add_node(url, statics=statics, links=links)
+    for link in links:
+        sitemap.add_edge(url, link)
     return links
 
 def fetch_website_gevent(sitemap, seen, base, urls):
